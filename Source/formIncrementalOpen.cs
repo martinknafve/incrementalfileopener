@@ -13,12 +13,33 @@ namespace IncrementalOpener
     {
         private ListViewColumnSorter _columnSorter = new ListViewColumnSorter();
 
+        /// <summary>
+        /// A list of all files in the solution.
+        /// </summary>
         private List<FileDetails> _fileDetails;
+
+        /// <summary>
+        /// The file the user has selected in the list.
+        /// </summary>
         private FileDetails _resultFile = null;
         
+        /// <summary>
+        /// The file the user selected the last time the 
+        /// dialog was shown. Is stored so that we can auto-select
+        /// the same file the next time the dialog is shown.
+        /// </summary>
         private string _lastSelectedFile = "";
+ 
+        /// <summary>
+        /// Flag indicating whether the dialog is loading. During load,
+        /// the content of the filtering textbox is changed. We don't want
+        /// this to trigger an actual filtering, hence the need for this flag.
+        /// </summary>
         private bool _loading = true;
-        private ListViewItem _itemToSelect = null;
+
+        /// <summary>
+        /// Take a long guess.
+        /// </summary>
         private const string WINDOW_TITLE = "Open file";
 
         public formIncrementalOpen()
@@ -43,8 +64,6 @@ namespace IncrementalOpener
             LoadWindowSettings();
 
             _loading = false;
-
-            FilterFileList();
 
             this.ShowDialog();
 
@@ -82,22 +101,19 @@ namespace IncrementalOpener
             // To prevent flickering
             this.listFiles.BeginUpdate();
 
-            // Create a list of all files matching the users searc criteria.
+            // We need to retrieve a list of all files matching the
+            // search criteria.
             List<FileDetails> matchingDetails = GetMatchingFiles();
 
             // Remove the old items to prevent duplicates.
             listFiles.Items.Clear();
 
-            // While adding files, we'll try to find the file we
-            // selected the last time. If we find it, we'll auto-
-            // select it now. This makes it easier for the user to open
-            // a list of files one at a time.
-            _itemToSelect = null;
-            bool autoSelectFileFound = false;
-
             List<ListViewItem> matchingItems = new List<ListViewItem>();
 
-            // Add all files matching the filter.
+            // Add all files matching the filter. We add them to a list first,
+            // so that we can use AddRange later on. This gives better performance
+            // than calling Add() over and over again.
+            ListViewItem itemToSelect = null;
             foreach (FileDetails matchingFile in matchingDetails)
             {
                 ListViewItem item = new ListViewItem(matchingFile.FileName, 0);
@@ -107,37 +123,39 @@ namespace IncrementalOpener
 
                 matchingItems.Add(item);
 
-                if (autoSelectFileFound == false && string.IsNullOrEmpty(_lastSelectedFile) == false)
+                if (itemToSelect == null && string.IsNullOrEmpty(_lastSelectedFile) == false)
                 {
                     // Is this the file we selected the last time? If so, select it again.
                     if (System.IO.Path.Combine(matchingFile.Path, matchingFile.FileName) == _lastSelectedFile)
                     {
-                        _itemToSelect = item;
-                        autoSelectFileFound = true;
+                        itemToSelect = item;
                     }
                 }
 
             }
 
+            // Disable sorting while we're adding the items. Not sure if this is 
+            // actually needed now when AddRange is being used.
             listFiles.ListViewItemSorter = null;
             listFiles.Items.AddRange(matchingItems.ToArray());
             listFiles.ListViewItemSorter = _columnSorter;
 
-            this.listFiles.EndUpdate();
-
-            // Select the correct item...
+            // Select the correct item. Either choose the item the user
+            // selected the last time, or just select the first item in the list.
             listFiles.SelectedIndices.Clear();
 
-            if (_itemToSelect != null)
+            if (itemToSelect != null)
             {
-                _itemToSelect.Selected = true;
-                
+                itemToSelect.Selected = true;
+                listFiles.EnsureVisible(itemToSelect.Index);
             }
             else if (listFiles.SelectedIndices.Count == 0)
             {
                 if (listFiles.Items.Count > 0)
                     listFiles.SelectedIndices.Add(0);
             }
+
+            this.listFiles.EndUpdate();
 
             this.Text = WINDOW_TITLE + string.Format(" ({0}/{1})", matchingDetails.Count, _fileDetails.Count);
             this.Cursor = Cursors.Default;
@@ -159,7 +177,7 @@ namespace IncrementalOpener
         }
 
         /// <summary>
-        /// Triggers a filtering of all the files
+        /// Triggers filtering of the files.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -195,17 +213,17 @@ namespace IncrementalOpener
             this.DialogResult = DialogResult.OK;
             this.Close();
         }
-
+        
         private void formIncrementalOpen_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Down)
             {
-                SelectNextFile(1);
+                MoveSelection(1);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Up)
             {
-                SelectPreviousFile(1);
+                MoveSelection(-1);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Enter)
@@ -215,12 +233,12 @@ namespace IncrementalOpener
             }
             else if (e.KeyCode == Keys.PageUp)
             {
-                SelectPreviousFile(10);
+                MoveSelection(-10);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.PageDown)
             {
-                SelectNextFile(10);
+                MoveSelection(10);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
@@ -231,9 +249,9 @@ namespace IncrementalOpener
         }
 
         /// <summary>
-        /// Select the next file in the list.
+        /// Select previous or next file in the list.
         /// </summary>
-        private void SelectNextFile(int jump)
+        private void MoveSelection(int jump)
         {
             if (listFiles.Items.Count == 0)
                 return;
@@ -241,37 +259,21 @@ namespace IncrementalOpener
             int moveToIndex = 0;
 
             if (listFiles.SelectedItems.Count > 0)
+            {
                 moveToIndex = listFiles.SelectedIndices[0] + jump;
+            }
 
+            // Are we moving out of bound?
             if (moveToIndex >= listFiles.Items.Count)
-                return;
+                moveToIndex = listFiles.Items.Count - 1;
+            else if (moveToIndex < 0)
+                moveToIndex = 0;
             
             listFiles.SelectedIndices.Clear();
             listFiles.SelectedIndices.Add(moveToIndex);
             listFiles.EnsureVisible(moveToIndex);
         }
-        
-        /// <summary>
-        /// Select the previous file in the list.
-        /// </summary>
-        private void SelectPreviousFile(int jump)
-        {
-            if (listFiles.Items.Count == 0)
-                return;
-
-            int moveToIndex = 0;
-
-            if (listFiles.SelectedItems.Count > 0)
-                moveToIndex = listFiles.SelectedIndices[0] - jump;
-
-            if (moveToIndex < 0)
-                return;
-
-            listFiles.SelectedIndices.Clear();
-            listFiles.SelectedIndices.Add(moveToIndex);
-            listFiles.EnsureVisible(moveToIndex);
-        }
-
+ 
         /// <summary>
         /// When a file is selected, change its background color.
         /// This is made so that we always get coloring of the selected
@@ -386,21 +388,18 @@ namespace IncrementalOpener
 
         private void formIncrementalOpen_Shown(object sender, EventArgs e)
         {
+            FilterFileList();
+
             _columnSorter.SortColumn = listFiles.Columns[0].Index;
             listFiles.Sort();
-
-            // This is doen after the form is shown. EnsureVisible does not work
-            // before the scrollbars are shown. And they are shown when the dialog is.
-            if (_itemToSelect != null)
-                listFiles.EnsureVisible(_itemToSelect.Index);
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             if (e.Delta > 0)
-                SelectPreviousFile(1);    
+                MoveSelection(-1);    
             else
-                SelectNextFile(1);
+                MoveSelection(1);
             
 
             base.OnMouseWheel(e);

@@ -14,6 +14,12 @@ namespace IncrementalOpener
         {
             List<FileDetails> fileDetails = new List<FileDetails>();
 
+            /*
+             * Create a list of all projects and files in the solution, so
+             * that we can display them later on to the user. This is done
+             * prior to showing the dialog.
+             */
+
             Projects projects = _applicationObject.Solution.Projects;
             int projCount = _applicationObject.Solution.Projects.Count;
             
@@ -24,6 +30,10 @@ namespace IncrementalOpener
                 CreateFileList(project.Name, project.ProjectItems, ref fileDetails);
             }
 
+            /*
+             * formIncrementalOpen is the dialog in which the user filters
+             * the list of files.
+             */
             formIncrementalOpen openDlg = new formIncrementalOpen();
 
             FileDetails resultFile = openDlg.Show(fileDetails);
