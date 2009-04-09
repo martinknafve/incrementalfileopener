@@ -18,8 +18,8 @@ Name: "VisualStudio2008"; Description: "Visual Studio 2008"; Types: full; Check:
 Source: ..\Source\bin\IncrementalOpener.dll; DestDir: {app};  AfterInstall: WriteAddinFile
 
 [Dirs]
-Name: "{userdocs}\Visual Studio 2005\Addins"
-Name: "{userdocs}\Visual Studio 2008\Addins"
+Name: "{userdocs}\Visual Studio 2005\Addins"; Check: DirExists(ExpandConstant('{userdocs}\Visual Studio 2005'))
+Name: "{userdocs}\Visual Studio 2008\Addins"; Check: DirExists(ExpandConstant('{userdocs}\Visual Studio 2005'))
 
 [Messages]
 BeveledLabel=Incremental File Opener
