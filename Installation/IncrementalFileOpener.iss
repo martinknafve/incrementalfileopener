@@ -1,6 +1,6 @@
 [Setup]
 AppName=Incremental File Opener for Visual Studio 2005/2008
-AppVerName=IncrementalFileOpener v1.0
+AppVerName=IncrementalFileOpener v0.2
 AppCopyright=Copyright Martin Knafve 2009
 DefaultDirName={pf}\IncrementalFileOpener
 PrivilegesRequired=admin
