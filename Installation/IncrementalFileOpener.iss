@@ -61,3 +61,5 @@ begin
     SaveStringToFile(ExpandConstant('{userdocs}') + '\Visual Studio 2008\Addins\IncrementalOpener.AddIn', output, false);
    end;
 end;
+
+
